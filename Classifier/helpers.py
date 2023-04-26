@@ -35,18 +35,15 @@ def labelCounts(y: pd.Series):
     """
     return dict(y.value_counts())
 
-def partition(
-    df: pd.DataFrame, 
-    X: pd.DataFrame, 
-    y: pd.Series, 
-    question: Question
-    ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
+def partition(df: pd.DataFrame, 
+              X: pd.DataFrame, 
+              y: pd.Series, 
+              question: Question
+              ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
     """
     For every row in <df>, check if it matches the <question>.
-    If it matches, add to trueDf, otherwise add to falseDf.
-
-    trueDf consists of all rows such that the <question> is True.
-    falseDf consists of the remaining (False) rows.
+    Return a df of the matching rows, followed by a df for those which
+    did not match.
 
     Example Usage:
     >>> data = pd.DataFrame({
@@ -67,19 +64,23 @@ def partition(
         "colour" : ["Green", "Yellow", "Yellow"],
         "diameter" : [3, 3, 3]
     }) # The rows that do not match with the question
+
+
     """
 
     # Get indices
     trueIndices = question.match(df)
     falseIndices = ~trueIndices
+
     # True
     trueDf = X.loc[trueIndices]
-    trueLabels = y.loc[trueIndices]
+    #trueLabels = y.loc[trueIndices]
+
     # False
     falseDf = X.loc[falseIndices]
-    falseLabels = y.loc[falseIndices]
+    #falseLabels = y.loc[falseIndices]
 
-    return trueDf, trueLabels, falseDf, falseLabels
+    return trueDf, falseDf
 
 def gini(y: pd.Series) -> float: # This might need to accept a <colname> param
     """
@@ -164,8 +165,12 @@ def findBestSplits(df: pd.DataFrame) -> tuple[float, Question]:
     >>> gain, q = findBestSplits(data)
     >>> gain
     0.37333333333333324
-    >>> q
-    Is colour == Red?
+    >>> print(q)
+    'Is colour == Red?'
+
+    Note in the example above, if multiple questions yield the same 
+    highest info gain, only the first question to yield that gain will 
+    be returned.
     """
 
     # TRY USING RANDOM SUBSETS TO AVOID OVERFITTING.
@@ -177,15 +182,16 @@ def findBestSplits(df: pd.DataFrame) -> tuple[float, Question]:
     currentUncertainty = gini(df)
     
     # For each column
-    Xcols = set(df.columns)
-    Xcols.remove("label") # Need a better way to drop this
+    Xcols = list(df.columns)
+    Xcols.remove("label")
     for col in Xcols:
         # For each unique entry in that column
         for val in uniqueValues(df, col):
             currentQuestion = Question(col, val)
             
-            # Attempt a split; we wan't it to actually divide the df
+            # Attempt partition
             trueDf, falseDf = partition(df, currentQuestion)
+
             # If the split didn't divide anything, skip this iteration
             # because it will yield no information
             if not (trueDf.shape[0] or falseDf.shape[0]): # One split empty || other split full
@@ -196,3 +202,7 @@ def findBestSplits(df: pd.DataFrame) -> tuple[float, Question]:
                 bestGain, bestQuestion = currentGain, currentQuestion
 
     return bestGain, bestQuestion
+
+
+if __name__ == '__main__':
+    from doctest import testmod; testmod()
